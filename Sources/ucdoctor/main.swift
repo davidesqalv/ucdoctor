@@ -71,7 +71,7 @@ case "kick":
     performKick(hard: args.contains("--hard")) { print("• \($0)") }
 case "snapshot":
     snapshotWindow(to: URL(fileURLWithPath: args.count > 1 ? args[1] : "snapshot.png"), dark: args.contains("dark"),
-                   demoFixPlan: args.contains("fixplan"))
+                   demo: args.contains("demo"))
 case "make-icon":
     try makeIconSet(at: URL(fileURLWithPath: args.count > 1 ? args[1] : "AppIcon.iconset"))
 case "version", "--version":

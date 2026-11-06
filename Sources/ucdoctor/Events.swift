@@ -397,3 +397,29 @@ func parseSharing(_ message: String) -> SharingObs? {
     }
     return nil
 }
+
+extension Monitor {
+    /// Made-up devices and events for README screenshots (`ucdoctor snapshot … demo`). Nothing real is read or written.
+    func loadDemo(phoneName: String, now: Date) {
+        writeToFile = false
+        historySince = now.addingTimeInterval(-3 * 3600)
+        phone = PhoneInfo(id: UUID().uuidString, name: phoneName, model: "iPhone18,1", lastSeen: now.addingTimeInterval(-4))
+        lastPhoneBeacon = (now.addingTimeInterval(-37), false)
+        let seconds: [(Signal, Double)] = [(.beacon, 4), (.phoneBeacon, 37), (.macSent, 190), (.macCopied, 196), (.phonePeeked, 195)]
+        for (signal, s) in seconds { last[signal] = now.addingTimeInterval(-s) }
+        func e(_ s: Double, _ signal: Signal, _ lane: Lane, _ level: Level, _ text: String) -> Event {
+            Event(date: now.addingTimeInterval(-s), signal: signal, lane: lane, level: level, text: text, raw: "")
+        }
+        recent = [
+            e(1500, .note, .doctor, .ok, "Status: No faults detected on this Mac"),
+            e(1499, .phoneNearby, .nearby, .ok, "\(phoneName) is nearby"),
+            e(196, .macCopied, .toPhone, .info, "You copied on the Mac; offering it to your devices"),
+            e(195, .phonePeeked, .toPhone, .info, "A device looked at what the Mac is offering"),
+            e(190, .macSent, .toPhone, .ok, "Mac clipboard delivered"),
+            e(45, .note, .doctor, .info, "Test started: iPhone → Mac"),
+            e(37, .phoneBeacon, .toMac, .info, "Heard \(phoneName); no clipboard in its broadcast"),
+            e(15, .note, .doctor, .bad, "Test result: \(phoneName) is right here but didn't offer the copy"),
+            e(15, .note, .doctor, .warn, "This Mac checks out; the problem is on the iPhone. Suggested first: restarting the iPhone"),
+        ]
+    }
+}

@@ -116,26 +116,89 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 }
 
-/// `ucdoctor snapshot out.png [dark]`: render the window offscreen (no screen access needed) to check the layout.
-func snapshotWindow(to url: URL, dark: Bool, demoFixPlan: Bool = false) {
+/// `ucdoctor snapshot out.png [dark] [demo]`: render the window offscreen (no screen access needed).
+/// `demo` swaps in made-up devices and events and draws a window frame, for the README.
+func snapshotWindow(to url: URL, dark: Bool, demo: Bool) {
     let app = NSApplication.shared
     app.setActivationPolicy(.prohibited)
     let model = AppModel()
     model.monitor.writeToFile = false
-    model.start()
-    RunLoop.main.run(until: Date().addingTimeInterval(7)) // history + first health check
-    if demoFixPlan { model.showDemoFixPlan() }
+    if demo {
+        model.loadDemo(phoneName: "Alex’s iPhone")
+    } else {
+        model.start()
+        RunLoop.main.run(until: Date().addingTimeInterval(7)) // history + first health check
+    }
 
+    let size = NSSize(width: 860, height: demo ? 904 : 860) // demo: end the activity list on a whole row
+    let appearance = NSAppearance(named: dark ? .darkAqua : .aqua)!
     let host = NSHostingView(rootView: ContentView(model: model))
-    host.frame = NSRect(x: 0, y: 0, width: 860, height: 860)
+    host.frame = NSRect(origin: .zero, size: size)
     let window = NSWindow(contentRect: host.frame, styleMask: [.titled], backing: .buffered, defer: false)
-    window.appearance = NSAppearance(named: dark ? .darkAqua : .aqua)
+    window.appearance = appearance
     window.contentView = host
     host.layoutSubtreeIfNeeded()
     RunLoop.main.run(until: Date().addingTimeInterval(1))
 
-    guard let rep = host.bitmapImageRepForCachingDisplay(in: host.bounds) else { return }
-    host.cacheDisplay(in: host.bounds, to: rep)
-    try? rep.representation(using: .png, properties: [:])?.write(to: url)
+    guard let content = host.bitmapImageRepForCachingDisplay(in: host.bounds) else { return }
+    host.cacheDisplay(in: host.bounds, to: content)
     model.stop()
+    let image = demo ? framed(content, size: size, appearance: appearance, dark: dark) : content
+    try? image.representation(using: .png, properties: [:])?.write(to: url)
+}
+
+/// Wraps a rendered window body in macOS-style chrome (title bar, traffic lights, shadow) on a transparent canvas.
+private func framed(_ content: NSBitmapImageRep, size: NSSize, appearance: NSAppearance, dark: Bool) -> NSBitmapImageRep {
+    let scale = CGFloat(content.pixelsWide) / size.width
+    let titleBar: CGFloat = 32, pad: CGFloat = 44, radius: CGFloat = 12
+    let canvas = NSSize(width: size.width + pad * 2, height: size.height + titleBar + pad * 2)
+    let win = NSRect(x: pad, y: pad + 6, width: size.width, height: size.height + titleBar)
+    let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: Int(canvas.width * scale), pixelsHigh: Int(canvas.height * scale),
+                               bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
+                               colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0)!
+    rep.size = canvas
+    NSGraphicsContext.saveGraphicsState()
+    NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: rep)
+    appearance.performAsCurrentDrawingAppearance {
+        let shape = NSBezierPath(roundedRect: win, xRadius: radius, yRadius: radius)
+
+        NSGraphicsContext.saveGraphicsState()
+        let shadow = NSShadow()
+        shadow.shadowColor = NSColor.black.withAlphaComponent(dark ? 0.55 : 0.28)
+        shadow.shadowBlurRadius = 28
+        shadow.shadowOffset = NSSize(width: 0, height: -10)
+        shadow.set()
+        NSColor.windowBackgroundColor.setFill()
+        shape.fill()
+        NSGraphicsContext.restoreGraphicsState()
+
+        NSGraphicsContext.saveGraphicsState()
+        shape.addClip()
+        NSColor.windowBackgroundColor.setFill()
+        win.fill()
+        content.draw(in: NSRect(x: win.minX, y: win.minY, width: size.width, height: size.height))
+        NSColor.separatorColor.setFill()
+        NSRect(x: win.minX, y: win.maxY - titleBar, width: size.width, height: 1 / scale).fill()
+
+        let lights = [NSColor(srgbRed: 1.00, green: 0.37, blue: 0.34, alpha: 1),
+                      NSColor(srgbRed: 1.00, green: 0.74, blue: 0.18, alpha: 1),
+                      NSColor(srgbRed: 0.16, green: 0.78, blue: 0.25, alpha: 1)]
+        for (i, color) in lights.enumerated() {
+            let dot = NSRect(x: win.minX + 14 + CGFloat(i) * 20, y: win.maxY - titleBar / 2 - 6, width: 12, height: 12)
+            color.setFill()
+            NSBezierPath(ovalIn: dot).fill()
+        }
+        let title = NSAttributedString(string: "UC Doctor", attributes: [
+            .font: NSFont.systemFont(ofSize: 13, weight: .semibold), .foregroundColor: NSColor.labelColor,
+        ])
+        let t = title.size()
+        title.draw(at: NSPoint(x: win.midX - t.width / 2, y: win.maxY - titleBar / 2 - t.height / 2))
+        NSGraphicsContext.restoreGraphicsState()
+
+        (dark ? NSColor.white.withAlphaComponent(0.14) : NSColor.black.withAlphaComponent(0.14)).setStroke()
+        shape.lineWidth = 1
+        shape.stroke()
+    }
+    NSGraphicsContext.restoreGraphicsState()
+    return rep
 }

@@ -282,7 +282,10 @@ final class AppModel: ObservableObject {
 
     // MARK: Fixing the iPhone side
 
+    var demoLastFix: (fix: PhoneFix, date: Date)?
+
     var lastFix: (fix: PhoneFix, date: Date)? {
+        if let demo = demoLastFix { return demo }
         guard let raw = UserDefaults.standard.string(forKey: "lastPhoneFix"), let fix = PhoneFix(rawValue: raw) else { return nil }
         let t = UserDefaults.standard.double(forKey: "lastPhoneFixAt")
         return (fix, Date(timeIntervalSince1970: t))
@@ -329,13 +332,25 @@ final class AppModel: ObservableObject {
         }
     }
 
-    /// For `ucdoctor snapshot … fixplan`: show the panel without running a real test.
-    func showDemoFixPlan() {
-        var steps = PhoneFix.allCases
-        if let last = lastFix?.fix { steps.removeAll { $0 == last }; steps.insert(last, at: 0) }
-        var plan = PhoneFixPlan(kind: .toMac, steps: steps)
-        plan.tried = [steps[0]]
-        fixPlan = plan
+    /// For README screenshots: the moment UC Doctor has proved the iPhone is the stuck side.
+    func loadDemo(phoneName: String) {
+        let now = Date()
+        monitor.loadDemo(phoneName: phoneName, now: now)
+        var h = Health()
+        h.bluetoothOn = true
+        h.wifiOn = true
+        h.awdlUp = true
+        h.uptime = ["useractivityd": 7200, "sharingd": 7200, "pboard": 260_000, "rapportd": 260_000, "bluetoothd": 260_000]
+        h.checked = true
+        health = h
+        demoLastFix = (.restart, now.addingTimeInterval(-6 * 86400))
+        fixPlan = PhoneFixPlan(kind: .toMac, steps: [.restart, .handoff, .bluetooth])
+        result = TestResult(kind: .toMac, outcome: .failed, title: "\(phoneName) is right here but didn't offer the copy",
+                            advice: "The Mac heard \(phoneName) 8s into the test, and its broadcast said it had nothing on its clipboard to share. The copy never left the iPhone.\n\nThis Mac checks out, so the fix is on the iPhone: see the steps above.",
+                            capture: nil)
+        lastPresence = .nearby
+        lastHeadline = "The problem is on your iPhone"
+        ready = true
         sync()
     }
 

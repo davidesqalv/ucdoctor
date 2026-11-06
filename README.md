@@ -2,6 +2,15 @@
 
 Finds out why Universal Clipboard (copy on your iPhone, paste on your Mac, and back) isn't working, and gets it going again.
 
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/screenshot-dark.png">
+    <img src="docs/screenshot-light.png" width="820" alt="UC Doctor in the middle of a diagnosis: the Mac checks out and hears the iPhone, but a test shows the iPhone never offered its clipboard, so it lists fixes to try on the iPhone, restart first because that worked last time.">
+  </picture>
+</p>
+
+<p align="center"><sub>Mid-diagnosis: this Mac checks out, a test proved the iPhone never offered the copy, and the fix that worked last time is listed first. (Demo data.)</sub></p>
+
 Universal Clipboard fails silently. UC Doctor watches the macOS services behind it and tells you which side dropped the copy: this Mac, your iPhone, or the link between them.
 
 ## What it shows
@@ -42,6 +51,7 @@ To remove it, run `./uninstall.sh`. Add `--logs` to delete the logs too.
 ucdoctor status          # checks, diagnosis, your iPhone, last 2 hours of events
 ucdoctor watch           # print clipboard events as they happen
 ucdoctor kick [--hard]   # same as the buttons
+ucdoctor snapshot out.png [dark] [demo]   # render the window to a PNG (demo = made-up data, as above)
 ```
 
 The binary is `~/Applications/UC Doctor.app/Contents/MacOS/ucdoctor`.
